@@ -1,0 +1,26 @@
+{
+  "name": "imdb-crawler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "firebase": "^5.2.0",
+    "puppeteer": "^1.5.0",
+    "ramda": "^0.25.0",
+    "tryordefault": "^1.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minhnhut/imdb-crawler.git"
+  },
+  "author": "Minh Nhut",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/minhnhut/imdb-crawler/issues"
+  },
+  "homepage": "https://github.com/minhnhut/imdb-crawler#readme"
+}

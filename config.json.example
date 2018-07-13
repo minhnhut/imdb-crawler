@@ -1,0 +1,4 @@
+{
+    "apiKey": "put api key here",
+    "databaseURL": "https://yourdatabasedomain.firebaseio.com/",
+}

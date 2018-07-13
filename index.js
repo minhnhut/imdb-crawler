@@ -1,14 +1,16 @@
 const firebase = require("firebase");
 const puppeteer = require('puppeteer');
-const cheerio = require("cheerio");
 const R = require("ramda");
+const {tryOrDefault, tryOrDefaultAsync} = require("tryordefault");
+console.log(tryOrDefault(
+    () => JSON.parse("[}"),
+    {}
+));
+
 
 // Set the configuration for your app
 // TODO: Replace with your project's config object
-var config = {
-    apiKey: "AIzaSyDALqs2H6Zi3Akl6KWpR5wutESXsl8I1g4",
-    databaseURL: "https://noadsplayer.firebaseio.com/",
-};
+var config = require("./config");
 firebase.initializeApp(config);
 
 // Get a reference to the database service
@@ -30,26 +32,34 @@ async function getConfig() {
     return config;
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getResourceTree(page) {
+    var resource = await page._client.send('Page.getResourceTree');
+    return resource.frameTree;
+}
+
+async function getResourceContent(page, url) {
+    const { content, base64Encoded } = await page._client.send(
+        'Page.getResourceContent',
+        { frameId: String(page.mainFrame()._id), url },
+    );
+    return content;
+};
+
 async function crawlId(id, browser)
 {
     const page = await browser.newPage();
     const response = await page.goto('https://www.imdb.com/title/'+id+'/');
-    console.log(response.status());
     if (response.status() !== 200) {
         return {};
     }
 
-    const tryOrDefault = async (f, defaultValue) => {
-        try {
-            return await f();
-        } catch (e) {
-            return defaultValue;
-        }
-    };
-
     // year
     const cleanUpYear = cleanUpBracket = R.replace(/\((\d{4})\)/, "$1");
-    const rawYear = await tryOrDefault(
+    const rawYear = await tryOrDefaultAsync(
         async () => await page.$eval("#titleYear", yearEl => yearEl.innerText),
         ""
     );
@@ -63,19 +73,42 @@ async function crawlId(id, browser)
         R.trim,
         removeYear
     );
-    const title = tryOrDefault(
+    const title = await tryOrDefaultAsync(
         async () => cleanUpTitle(await page.$eval("h1[itemprop='name']", h1 => h1.innerText)),
         ""
     );
+
+    const parentTitle = await tryOrDefaultAsync(
+        async () => await page.$eval("div.titleParent", h1 => h1.innerText),
+        ""
+    )
 
     // meta
     const subText = await page.$(".title_wrapper .subtext");
     const cleanUpDuration = R.trim;
     
-    const duration = cleanUpDuration();
+    const duration = await tryOrDefaultAsync(
+        async () => cleanUpDuration(await subText.$eval("[itemprop='duration']", el => el.innerText)),
+        ""
+    );
 
     const cleanUpGenre = R.map(R.trim);
-    const genre = cleanUpGenre(await subText.$$eval("[itemprop='genre']", elements => elements.map(el => el.innerText)));
+    const genre = await tryOrDefaultAsync(
+        async () => cleanUpGenre(await subText.$$eval("[itemprop='genre']", elements => elements.map(el => el.innerText))),
+        ""
+    );
+
+    const thumbnailUrl = await tryOrDefaultAsync(
+        async () => {return ""},
+        ""
+    );
+
+    const thumbnailAsBase64 = await tryOrDefaultAsync(
+        async () => {
+            return "abc";
+        },
+        ""
+    );
 
     await page.close();
     // 
@@ -84,7 +117,8 @@ async function crawlId(id, browser)
         title: title,
         year: year,
         duration: duration,
-        genres: genre
+        genres: genre,
+        parent_title: parentTitle
     }
 }
 
@@ -133,12 +167,10 @@ async function main() {
         console.log(currentId);
         const result = await crawlId(currentId, browser);
         console.log(result);
+        firebase.database().ref('crawl/' + currentId).set(result);
+        console.log("======================");
     } while(runtime.current_id !== runtime.to_id);
     await browser.close();
 }
 
 main();
-// firebase.database().ref('crawl/test').set({
-//     username: "New",
-//     email: "test"
-// });
